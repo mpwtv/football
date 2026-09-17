@@ -1,23 +1,26 @@
-name: Update Football
+name: Auto Update Streams Data
 
 on:
+  # Lắng nghe tín hiệu kích hoạt từ Cron-job.org
   repository_dispatch:
-    types: [trigger-football-crawl]
-  workflow_dispatch:
-  # Tùy chọn: Tự động chạy dự phòng mỗi 3 tiếng một lần
+    types: [update-football]
+  # Vẫn giữ chạy tự động mỗi 10 phút của GitHub để dự phòng
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: '*/10 * * * *'
+  # Cho phép bấm nút chạy thủ công
+  workflow_dispatch:
 
+# Cấp quyền ghi để bot có thể push file lên repo
 permissions:
   contents: write
 
-# Nâng cao: Tự động hủy luồng đang chạy dở nếu có tín hiệu mới gửi tới, tránh sung đột Git
+# Tự động hủy luồng cũ nếu có luồng mới được kích hoạt, tránh lỗi xung đột khi git push
 concurrency:
   group: update-football-group
   cancel-in-progress: true
 
 jobs:
-  update-streams:
+  update-data:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,7 +32,7 @@ jobs:
       - name: 2. Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
       - name: 3. Install dependencies
         run: |
@@ -37,23 +40,23 @@ jobs:
           pip install requests
 
       - name: 4. Run Python script
-        run: python crawl.py
+        run: python main.py
 
       - name: 5. Commit and Push changes
         env:
-          # Cài đặt múi giờ Việt Nam cho log commit
           TZ: 'Asia/Ho_Chi_Minh'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
-          git add tv.m3u full.m3u channels.json
+          # Thêm các file JSON và HTML vào danh sách chuẩn bị commit
+          git add tv.json full.json index.html
           
-          # Kiểm tra nếu thực sự có thay đổi mới thực hiện commit và push
+          # Kiểm tra nếu thực sự có sự thay đổi mới thì tiến hành commit và push
           if ! git diff --cached --quiet; then
-            git commit -m "⚡ Auto update streams - $(date '+%d/%m/%Y %H:%M:%S')"
+            git commit -m "⚡ Auto update JSON & HTML [skip ci] - $(date '+%d/%m/%Y %H:%M:%S')"
             git push
-            echo "✅ Files updated and pushed successfully!"
+            echo "✅ Đã cập nhật và push file thành công!"
           else
-            echo "ℹ️ No changes to commit."
+            echo "ℹ️ Không có thay đổi nào để commit."
           fi
